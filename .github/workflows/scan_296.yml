@@ -1,0 +1,61 @@
+name: Scan Mondo 296 (RE-IT-5)
+
+on:
+  schedule:
+    - cron: '0 */2 * * *' # Esegue ogni 2 ore
+  workflow_dispatch:      # Esecuzione manuale
+
+jobs:
+  scan_job:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Codice Scanner
+        uses: actions/checkout@v4
+
+      - name: Setup PHP e Node
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # 1. CLONA LA REPO RE-PANZA (Per prendere il DB storico)
+      - name: Clone Database Repo
+        env:
+          MY_PAT: ${{ secrets.PAT_GITHUB }} 
+        run: |
+          # Clona la repo dove teniamo i dati
+          git clone https://x-access-token:${MY_PAT}@github.com/Re-Panza/lk_database.git db_repo
+          
+          # Copia il file 296 nella cartella di lavoro (se esiste, altrimenti crea vuoto)
+          cp db_repo/database_mondo_296.json . || echo "[]" > database_mondo_296.json
+
+      # 2. ESEGUI SCANNER PHP (Versione 296)
+      - name: Run PHP Scanner 296
+        run: php scanner_296.php
+
+      # 3. AGGIORNA STORICO (Versione 296)
+      - name: Update History 296
+        run: node update_history_296.js
+
+      # 4. PUSHA I RISULTATI SU RE-PANZA
+      - name: Push to Re-Panza Database
+        env:
+          MY_PAT: ${{ secrets.PAT_GITHUB }}
+        run: |
+          cd db_repo
+          git config --global user.name "Re Panza Bot"
+          git config --global user.email "bot@repanza.it"
+          
+          # Copia il file aggiornato DALLA cartella di lavoro ALLA repo clonata
+          cp ../database_mondo_296.json .
+          
+          # Commit e Push
+          git add database_mondo_296.json
+          # Committa solo se ci sono cambiamenti
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Update 296: $(date)" && git push)
