@@ -18,8 +18,8 @@ SERVER_ID = "LKWorldServer-RE-IT-5"    # Es: LKWorldServer-IT-15
 WORLD_ID = "296"                       # Es: 337
 WORLD_NAME = "Italia V"       # Es: Italia 15 (DEVE ESSERE IDENTICO AL TASTO NEL GIOCO)
 BACKEND_URL = "https://backend1.lordsandknights.com" # Es: backend1, backend2 o backend3
-FILE_DATABASE = "database_mondo_296.json" # Cambia XXX col numero del mondo
-FILE_HISTORY = "cronologia_296.json"      # Cambia XXX col numero del mondo
+FILE_DATABASE = "database_mondo_296.json" # Cambia  col numero del mondo
+FILE_HISTORY = "cronologia_296.json"      # Cambia  col numero del mondo
 # =======================================================
 
 def send_telegram_alert(world_name):
