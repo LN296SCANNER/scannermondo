@@ -412,41 +412,72 @@ def enrich_db_with_names(db, player_map, alliance_map):
     count_updated = 0
     for key, record in db.items():
         pid = record.get('p')
+        
+        # --- FIX CASTELLI FANTASMA ---
         if pid and pid != 0:
             nome_nuovo = player_map.get(pid, "Sconosciuto")
-            if 'pn' not in record or record['pn'] == "Sconosciuto" or (record['pn'] != nome_nuovo and nome_nuovo != "Sconosciuto"):
+            if 'pn' not in record or record['pn'] != nome_nuovo:
                  record['pn'] = nome_nuovo
                  count_updated += 1
+        else:
+            if record.get('pn') != "Sconosciuto":
+                record['pn'] = "Sconosciuto"
+                count_updated += 1
                  
         aid = record.get('a')
         if aid and aid != 0:
             nome_alleanza = alliance_map.get(aid, "")
-            if 'an' not in record or record['an'] == "" or (record['an'] != nome_alleanza and nome_alleanza != ""):
+            if 'an' not in record or record['an'] != nome_alleanza:
                  record['an'] = nome_alleanza
-                 
-    print(f"♻️ [UNIONE DATI] Perfetto, i nomi di giocatori e alleanze sono stati applicati su {count_updated} castelli nel database.")
+        else:
+            if record.get('an') != "":
+                record['an'] = ""
+
+    print(f"♻️ [UNIONE DATI] Perfetto, i nomi di giocatori e alleanze sono stati applicati/puliti su {count_updated} castelli nel database.")
     return db
 
 def run_inactivity_check(data):
-    print("\n⏳ [INATTIVITÀ] Calcolo chi sta giocando e chi sta dormendo...")
-    inattivi_trovati = 0
+    print("\n⏳ [INATTIVITÀ] Calcolo chi sta giocando e chi sta dormendo (Analisi Globale Account)...")
+    
+    player_last_active = {}
+    
+    # FASE 1: Trovo l'ultimo segno di vita per ogni giocatore
     for key, h in data.items():
-        if not h.get('p') or h['p'] == 0: continue
+        p = h.get('p')
+        if not p or p == 0: continue
+        
         firma = f"{h.get('pn', 'Sconosciuto')}|{h.get('a', 0)}|{h['n']}|{h['pt']}"
         h['d'] = int(h['d'])
         
-        if 'u' not in h: h['u'] = h['d']; h['f'] = firma; continue
-        try: last = int(h['u'])
-        except: last = h['d']
-
-        if h.get('f') != firma:
-            h['u'] = h['d']; h['f'] = firma; h['i'] = False
+        if 'u' not in h or h.get('f') != firma:
+            ultimo_movimento = h['d']
         else:
-            if (h['d'] - last) >= 86400: 
-                h['i'] = True
-                inattivi_trovati += 1
-    
-    print(f"🛌 [INATTIVITÀ] Attualmente ci sono {inattivi_trovati} castelli inattivi da più di 24 ore.")
+            ultimo_movimento = int(h['u'])
+            
+        if p not in player_last_active or ultimo_movimento > player_last_active[p]:
+            player_last_active[p] = ultimo_movimento
+
+    # FASE 2: Applico lo stato di inattività a tutti i castelli
+    inattivi_trovati = 0
+    for key, h in data.items():
+        p = h.get('p')
+        if not p or p == 0: continue
+        
+        firma = f"{h.get('pn', 'Sconosciuto')}|{h.get('a', 0)}|{h['n']}|{h['pt']}"
+        
+        if 'u' not in h or h.get('f') != firma:
+            h['u'] = h['d']
+            h['f'] = firma
+        
+        secondi_fermo_giocatore = h['d'] - player_last_active.get(p, h['d'])
+        
+        if secondi_fermo_giocatore >= 86400: 
+            h['i'] = True
+            inattivi_trovati += 1
+        else:
+            h['i'] = False
+            
+    print(f"🛌 [INATTIVITÀ] Analisi completata: {inattivi_trovati} castelli appartengono a giocatori inattivi da più di 24 ore.")
     return data
 
 def run_history_check(old_db_list, new_db_list, history_file):
@@ -566,6 +597,7 @@ def run_unified_scanner():
         print(f"📥 Sto caricando il vecchio database '{FILE_DATABASE}' nella memoria temporanea e pulendo eventuali errori...")
         for entry in json.load(f): 
             
+            # --- ANTIVIRUS ID ---
             if 'id_habitat' in entry:
                 if not str(entry['id_habitat']).isdigit():
                     del entry['id_habitat'] 
